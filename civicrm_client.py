@@ -119,13 +119,11 @@ class CiviCRMClient:
 
         url = f"{self.base_url}/{entity}/{action}"
         payload = {"params": json.dumps(params, separators=(",", ":"))} or {}
-        # Vorsicht: Payload kann personenbezogene Daten enthalten -> nur gekürzt loggen
-
-        # # print("Schreiben auf STD-ERR", url, str(payload)[:800]), file=sys.stderr, flush=True)
 
         _logger.debug("APIv4 POST %s payload_preview=%s", url, str(payload)[:800])
 
         resp = await self._client.post(url, headers=self._headers(), data=payload)
+        
         _logger.debug("HTTP %s für %s", resp.status_code, url)
 
         try:

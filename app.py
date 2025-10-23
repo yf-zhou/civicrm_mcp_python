@@ -61,6 +61,16 @@ class SchemaFieldsInput(BaseModel):
     entity: str
     forceRefresh: bool = False
 
+class GetActionsInput(BaseModel):
+    entity: str
+
+class SaveInput(BaseModel):
+    entity: str
+    records: list[dict] = Field(..., description="Records to save (upsert)")
+    defaults: Optional[dict] = None
+    match: Optional[list[str]] = Field(None, description="Fields to match for updates")
+
+
 # ---------- Helpers ----------
 # def as_text_output(obj: Any) -> CallToolResult:
 #     """Serialize result as pretty JSON text for Claude."""
@@ -168,6 +178,56 @@ async def civicrm_schema_fields(input: SchemaFieldsInput, ctx: Context = None) -
             fields = out.get("values", [])
             schema_cache.set_fields(input.entity, fields)
     return as_text_output({"entity": input.entity, "fields": fields})
+
+@app.tool()
+async def civicrm_get_actions(input: GetActionsInput, ctx: Context = None) -> CallToolResult:
+    """Liste alle verfügbaren Actions für eine Entity mit Details"""
+    async with CiviCRMClient() as cli:
+        out = await cli.call(input.entity, "getActions", {
+            "select": ["name", "description", "params"],
+            "where": [["name", "NOT IN", ["getActions", "getFields"]]]
+        })
+    return as_text_output(out)
+
+@app.tool()
+async def civicrm_save(input: SaveInput, ctx: Context = None) -> CallToolResult:
+    """Upsert records (create or update based on match criteria)"""
+    params = {"records": input.records}
+    if input.defaults: params["defaults"] = input.defaults
+    if input.match: params["match"] = input.match
+    
+    async with CiviCRMClient() as cli:
+        out = await cli.call(input.entity, "save", params)
+    return as_text_output(out)
+
+@app.tool()
+async def civicrm_api_help(input: dict, ctx: Context = None) -> CallToolResult:
+    """Get comprehensive API documentation and available endpoints"""
+    help_info = {
+        "api_version": "v4",
+        "explorer_url": "/civicrm/api4",
+        "documentation": "https://docs.civicrm.org/dev/en/latest/api/v4/usage/",
+        "common_entities": [
+            "Contact", "Activity", "Contribution", "Event", 
+            "Membership", "Case", "Email", "Phone", "Address"
+        ],
+        "common_actions": [
+            "get", "create", "update", "delete", "save", 
+            "getFields", "getActions", "replace"
+        ],
+        "where_operators": [
+            "=", "!=", ">", ">=", "<", "<=",
+            "LIKE", "NOT LIKE", "IN", "NOT IN",
+            "BETWEEN", "NOT BETWEEN", "IS NULL", "IS NOT NULL"
+        ],
+        "sql_functions": [
+            "COUNT(*)", "COUNT(DISTINCT field)", "SUM(field)",
+            "AVG(field)", "MIN(field)", "MAX(field)",
+            "GROUP_CONCAT(field)"
+        ]
+    }
+    return as_text_output(help_info)
+
 
 #----------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
