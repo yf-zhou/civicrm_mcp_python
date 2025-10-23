@@ -17,7 +17,7 @@ import sys
 app = FastMCP("civicrm-mcp-python")
 schema_cache = SchemaCache(ttl_seconds=900)
 
-# ---------- Pydantic Input Models ----------
+# ---------- Pydantic Input Models      ----------
 class CreateInput(BaseModel):
     entity: str = Field(..., description="CiviCRM entity, e.g., Contact")
     record: dict = Field(..., description="Fields for create()")
