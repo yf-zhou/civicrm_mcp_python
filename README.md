@@ -7,7 +7,7 @@ Er stellt generische CRUD- und Query-Tools bereit und kann per **stdio** gestart
 - Tools: `civicrm.create`, `civicrm.get`, `civicrm.update`, `civicrm.delete`, `civicrm.search`  
 - Extras: `civicrm.batch`, `civicrm.schema.entities`, `civicrm.schema.fields`
 - Async mit `httpx` und `mcp` (FastMCP)
-- Konfig via `.env` (URL, Token, Auth-Schema etc.)
+- Config via `.env` (URL, Token, Auth-Schema etc.)
 - Einfacher Schema-Cache (in-memory)
 
 ## Quickstart
@@ -95,3 +95,16 @@ Der Server spricht MCP über **stdio**. Binde ihn in deinen Client/LLM ein als M
 
 ## Lizenz
 MIT
+
+## Aufsetzen des MCP-Servers mit Claude-Desktop
+Claude Desktop ist eines der Standard-Vorschläge zum Testen von MCP-Servern.
+Dieses Setup kann zeigen, welche prinzipiellen Möglichkeiten es in Zusammenarbeit von LLMs mit CiviCRM gibt.
+Die Fragen des Datenschutzes sind in diesem Setup bei weitem nicht geklärt: Cluade Desktop fragt zwar immer bei allen Zugriffen auf das CiviCRM, ob er dies durchführen soll, aber dann werden die Daten auf den Claude-Servern verarbeitet und die Fragen nach einer vollständigen Löschung bleiben unbeantwortet.
+Und bitte vorsichtig, da diese Implementierung über den vollständigen Funktionsumfang von APIV4 verfügt. Mit ein paar Befehlen ist schnell ein ganzen CiviCRM gelöscht!
+
+Zu den Umsetzungsschritten
+
+1) Claude-Desktop installieren, siehe hier https://support.claude.com/de/articles/10065433-claude-desktop-installieren
+2) eine claude_desktop_config.json konfiguriren: den Pfad zu dem Installationsverzeichnis, den CiviCRM-Pfad,Site-key und API-Key einsetzen.
+3) die claude_desktop_config.json an die richtige Stelle kopieren: unter Linux zu /home/???/.config/Claude/
+4) Claude-Desktop aufrufen und nach dem MCP-Server fragen ....
