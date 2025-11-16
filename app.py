@@ -17,7 +17,7 @@ import sys
 app = FastMCP("civicrm-mcp-python")
 schema_cache = SchemaCache(ttl_seconds=900)
 
-# ---------- Pydantic Input Models ----------
+# ---------- Pydantic Input Models      ----------
 class CreateInput(BaseModel):
     entity: str = Field(..., description="CiviCRM entity, e.g., Contact")
     record: dict = Field(..., description="Fields for create()")
@@ -281,22 +281,29 @@ async def civicrm_api_help(input: dict, ctx: Context = None) -> CallToolResult:
 #----------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        description="Nimmt eine Umgebungsdatei (env_file) entgegen."
-    )
-    parser.add_argument(
-        "--env-file", "-e",
-        required=True,
-        help="Pfad zur .env-Datei (z.B. /path/to/.env)"
-    )
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser(
+    #     description="Nimmt eine Umgebungsdatei (env_file) entgegen."
+    # )
+    # parser.add_argument(
+    #     "--env-file", "-e",
+    #     required=True,
+    #     help="Pfad zur .env-Datei (z.B. /path/to/.env)"
+    # )
+    # args = parser.parse_args()
 
-    env_file = os.path.abspath(args.env_file)
-    if not os.path.exists(env_file):
-        print(f"Fehler: Datei nicht gefunden: {env_file}", file=sys.stderr)
-        sys.exit(1)
+    # env_file = os.path.abspath(args.env_file)
+    # if not os.path.exists(env_file):
+    #     print(f"Fehler: Datei nicht gefunden: {env_file}", file=sys.stderr)
+    #     sys.exit(1)
 
-    load_dotenv(env_file)
+    # load_dotenv(env_file)
+
+    # CIVICRM_BASE = os.environ.get('CIVICRM_BASE')
+    # CIVI_USER_KEY = os.environ.get('CIVI_USER_KEY')
+    # CIVI_SITE_KEY = os.environ.get('CIVI_SITE_KEY')
+    # HTTP_TIMEOUT = int(os.environ.get('HTTP_TIMEOUT', '30'))
+    # LOG_FILE = os.environ.get('LOG_FILE', 'civicrm_mcp.log')
+    # LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
     # stdio mode
     app.run()
