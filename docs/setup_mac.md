@@ -94,7 +94,7 @@ Details
 
 ```json
 {
-    "ok": true,
+  "ok": true,
   "server": "civicrm-mcp-python"
 }
 ```
@@ -116,7 +116,7 @@ The LLM must be able to authenticate with the Civi site. There are multiple ways
 
 ```php
 $token = Civi::service('crypto.jwt')->encode([
-    'exp' => time() + 60*60,      // Expires in 60 minutes
+    'exp' => time() + 60*60,        // Expires in 60 minutes
     'sub' => 'cid:203',             // Subject (contact ID)
     'scope' => 'authx',             // Allow general authentication
 ]);
