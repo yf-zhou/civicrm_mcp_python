@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "civicrm": {
+      "command": "/...full path to.../civicrm_mcp_python/.venv/bin/python3",
+      "args": ["/...full path to.../civicrm_mcp_python/app.py"],
+      "env": {
+        "CIVI_URL": "https://example-site.com/civicrm/ajax/api4",
+        "AUTH_SCHEME": "bearer",
+        "CIVI_TOKEN": "user API key",
+        "CIVI_USER_KEY": "user API key",
+        "CIVI_SITE_KEY": "site API key"
+      }
+    }
+  }
+}
