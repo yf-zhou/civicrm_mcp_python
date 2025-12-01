@@ -48,6 +48,8 @@ CIVI_TOKEN=user_api_token
 - In some cases, `CIVI_URL` should be `https://website-base-url-goes-here/civicrm/ajax/api4`
 - See [Notes](#api-key-method) for details on the API key
 
+> :warning: Never provide environment variables directly to the LLM (e.g., through chat) unless you're ok with granting it unrestricted, unmonitored access to your Civi site with admin privileges.
+
 ### Claude
 
 - Complete the Claude desktop installation instructions from: https://support.claude.com/en/articles/10065433-installing-claude-desktop
