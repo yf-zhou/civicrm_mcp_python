@@ -10,10 +10,11 @@ from mcp.types import CallToolResult, TextContent
 
 from civicrm_client import CiviCRMClient
 from schema_cache import SchemaCache
+from gdpr_filter import GDPRFieldFilter
 import argparse
 import sys
 
-app = FastMCP("civicrm-mcp-unrestricted")
+app = FastMCP("civicrm-mcp-gdpr")
 schema_cache = SchemaCache(ttl_seconds=900)
 
 # ---------- Pydantic Input Models      ----------
@@ -59,7 +60,7 @@ class BatchInput(BaseModel):
 
 class SchemaEntitiesInput(BaseModel):
     """Input for getting schema entities"""
-    refresh: bool = Field(False, description="Force refresh cache")
+    pass
 
 class SchemaFieldsInput(BaseModel):
     entity: str
@@ -91,7 +92,7 @@ def as_text_output(obj: Any) -> CallToolResult:
 @app.tool()
 async def ping(input: PingInput) -> CallToolResult:
     """Health check of the MCP server (no CiviCRM call)."""
-    return as_text_output({"ok": True, "server": "civicrm-mcp-python"})
+    return as_text_output({"ok": True, "server": "civicrm-mcp-gdpr"})
 
 @app.tool()
 async def civicrm_create(input: CreateInput) -> CallToolResult:
@@ -111,7 +112,10 @@ async def civicrm_get(input: GetInput) -> CallToolResult:
     if input.include: params["include"] = input.include
     async with CiviCRMClient() as cli:
         out = await cli.call(input.entity, "get", params)
-    return as_text_output(out)
+    
+    # DSGVO-Filterung anwenden
+    filtered_out = GDPRFieldFilter.filter_response(input.entity, out)
+    return as_text_output(filtered_out)
 
 @app.tool()
 async def civicrm_update_request(input: UpdateInput) -> CallToolResult:
@@ -122,14 +126,21 @@ async def civicrm_update_request(input: UpdateInput) -> CallToolResult:
     async with CiviCRMClient() as cli:
         current = await cli.call(input.entity, "get", get_payload)
     
-    current_values = current.get("values", [{}])[0] if current.get("values") else {}
+    # DSGVO-Filterung auf die aktuellen Werte anwenden
+    filtered_current = GDPRFieldFilter.filter_response(input.entity, current)
+    current_values = filtered_current.get("values", [{}])[0] if filtered_current.get("values") else {}
     
-    # Show what will change
+    # Show what will change (nur erlaubte Felder anzeigen)
     changes = {}
     for key, new_value in input.record.items():
-        old_value = current_values.get(key)
-        if old_value != new_value:
-            changes[key] = {"old": old_value, "new": new_value}
+        # Prüfen ob das Feld überhaupt angezeigt werden darf
+        if GDPRFieldFilter.is_field_allowed(input.entity, key):
+            old_value = current_values.get(key)
+            if old_value != new_value:
+                changes[key] = {"old": old_value, "new": new_value}
+        else:
+            # Feld ist nicht erlaubt, aber wir zeigen dass es geändert wird
+            changes[key] = {"old": "[FILTERED]", "new": "[FILTERED]"}
     
     confirmation_msg = {
         "status": "confirmation_required",
@@ -137,7 +148,8 @@ async def civicrm_update_request(input: UpdateInput) -> CallToolResult:
         "id": input.id,
         "current_record": current_values,
         "proposed_changes": changes,
-        "message": f"⚠️ Ready to update {input.entity} ID {input.id}. Use civicrm_update_confirmed to proceed."
+        "message": f"⚠️ Ready to update {input.entity} ID {input.id}. Use civicrm_update_confirmed to proceed.",
+        "_note": "Some fields may be filtered for GDPR compliance"
     }
     
     return as_text_output(confirmation_msg)
@@ -163,12 +175,16 @@ async def civicrm_delete_request(input: DeleteInput) -> CallToolResult:
     async with CiviCRMClient() as cli:
         record = await cli.call(input.entity, "get", get_payload)
     
+    # DSGVO-Filterung anwenden
+    filtered_record = GDPRFieldFilter.filter_response(input.entity, record)
+    
     confirmation_msg = {
         "status": "confirmation_required",
         "entity": input.entity,
         "id": input.id,
-        "record": record.get("values", []),
-        "message": f"⚠️ Ready to delete {input.entity} ID {input.id}. Use civicrm_delete_confirmed to proceed."
+        "record": filtered_record.get("values", []),
+        "message": f"⚠️ Ready to delete {input.entity} ID {input.id}. Use civicrm_delete_confirmed to proceed.",
+        "_note": "Record preview filtered for GDPR compliance"
     }
     
     return as_text_output(confirmation_msg)
@@ -194,7 +210,10 @@ async def civicrm_search(input: SearchInput) -> CallToolResult:
     if input.offset is not None: params["offset"] = input.offset
     async with CiviCRMClient() as cli:
         out = await cli.call(input.entity, "get", params)
-    return as_text_output(out)
+    
+    # DSGVO-Filterung anwenden
+    filtered_out = GDPRFieldFilter.filter_response(input.entity, out)
+    return as_text_output(filtered_out)
 
 @app.tool()
 async def civicrm_batch(input: BatchInput) -> CallToolResult:
@@ -203,6 +222,11 @@ async def civicrm_batch(input: BatchInput) -> CallToolResult:
     async with CiviCRMClient() as cli:
         for op in input.operations:
             res = await cli.call(op.entity, op.action, op.params)
+            
+            # DSGVO-Filterung nur bei "get"-Operationen anwenden
+            if op.action == "get":
+                res = GDPRFieldFilter.filter_response(op.entity, res)
+            
             results.append(res)
     return as_text_output({"results": results})
 
