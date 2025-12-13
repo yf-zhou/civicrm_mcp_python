@@ -23,6 +23,8 @@ This MCP server provides generic CRUD and query tools for CiviCRM APIv4 and can 
 
 ### Quickstart
 
+> A note on Python: the following commands may need to be run with `python3` instead of `python`, and `pip3` instead of `pip`. 
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -363,6 +365,10 @@ MIT
 # Deutsche Version
 
 ## Übersicht
+1) Install Claude Desktop, see here https://support.claude.com/en/articles/10065433-installing-claude-desktop
+2) Configure a claude_desktop_config.json: insert the path to the installation directory, the CiviCRM path, site key, and API key (see `example_claude_desktop_config.json`)
+3) Copy the claude_desktop_config.json to the correct location: on Linux to `/home/???/.config/Claude/`, on Mac to `~/Library/Application Support/Claude/`
+4) Launch Claude Desktop and ask about the MCP server....
 
 Dieser MCP-Server stellt generische CRUD- und Query-Tools für CiviCRM APIv4 bereit und kann per **stdio** gestartet werden. Er enthält eine integrierte DSGVO-konforme Filterung, die verhindert, dass personenbezogene Daten aus der CiviCRM-Datenbank ins LLM (Large Language Model) übertragen werden.
 
@@ -710,3 +716,7 @@ Bei Fragen oder Problemen:
 ## Lizenz
 
 MIT
+1) Claude-Desktop installieren, siehe hier https://support.claude.com/de/articles/10065433-claude-desktop-installieren
+2) eine claude_desktop_config.json konfiguriren: den Pfad zu dem Installationsverzeichnis, den CiviCRM-Pfad,Site-key und API-Key einsetzen.
+3) die claude_desktop_config.json an die richtige Stelle kopieren: unter Linux zu `/home/???/.config/Claude/`, unter Mac zu `~/Library/Application Support/Claude/`
+4) Claude-Desktop aufrufen und nach dem MCP-Server fragen ....
