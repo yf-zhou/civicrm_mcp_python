@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import logging
 from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
@@ -277,6 +278,38 @@ async def civicrm_api_help(input: dict, ctx: Context = None) -> CallToolResult:
     }
     return as_text_output(help_info)
 
+@app.tool()
+async def civicrm_searchdisplay_run(savedSearch: str, searchDisplay = None, ctx: Context = None) -> CallToolResult:
+    """Run the Saved Search with name given by parameter savedSearch. Optionally specifies the name of an associated Search Display to run. Returns results."""
+    
+    # Returns name of results file for rendering."""
+    entity = "SearchDisplay"
+    action = "run"
+
+    params = {
+        "savedSearch": savedSearch,
+    }
+    if searchDisplay:
+        params['display'] = searchDisplay
+
+    async with CiviCRMClient() as cli:
+        out = await cli.call(entity, action, params)
+
+    # write output to file
+    # output_file = [full path]
+    # logging.info(f"pwd: {os.getcwd()}")
+    # logging.info(f"directory contents: {os.listdir()}")
+    # logging.info(f"output file path: {os.path.abspath(output_file)}")
+    # with open(output_file, 'w') as f:
+    #     f.write(json.dumps(out, indent=2))
+
+    return as_text_output(out)
+
+    # with open('response_output.json', 'r') as f:
+    #     data = json.loads(f.read())
+    
+    # return as_text_output(data)
+    # return output_file
 
 #----------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
