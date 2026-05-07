@@ -74,6 +74,8 @@ CIVI_TOKEN=user_api_token
 }
 ```
 
+Note that `CIVI_USER_KEY` should be the same as `CIVI_TOKEN` and `CIVI_SITE_KEY` can be found in the site's `civicrm.settings.php`
+
 ## Using the MCP server
 
 Refer to the repo’s `README` for the available tools.
@@ -99,6 +101,15 @@ Details
   "ok": true,
   "server": "civicrm-mcp-python"
 }
+```
+
+## Adding certificates for MAMP Pro
+
+MAMP Pro signs its own CA Certificates for local sites and adds them directly to the operating system's keychain for SSL verification. However, python (and by extension this MCP server) uses its own certificate store from the `certifi` package. Use the following command from the mcp server directory to add MAMP Pro's certificate to python:
+
+```sh
+source .venv/bin/activate
+cat /Applications/MAMP/Library/OpenSSL/certs/mcp-site.crt >> $(python3 -c "import certifi; print(certifi.where())")
 ```
 
 ## Notes
