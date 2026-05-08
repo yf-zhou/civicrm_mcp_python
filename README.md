@@ -88,6 +88,14 @@ The server communicates via **stdio** using the MCP protocol. Integrate it into 
 }
 ```
 
+#### civicrm.searchdisplay_run
+```json
+{
+  "savedSearch": "Bookkeeping_Transactions",
+  "searchDisplay": "Bookkeeping_Transactions_Table_1"
+}
+```
+
 #### civicrm.batch
 ```json
 {
@@ -443,6 +451,14 @@ Der Server spricht MCP über **stdio**. Binde ihn in deinen Client/LLM ein als M
   "orderBy": {"id": "DESC"},
   "limit": 25,
   "offset": 0
+}
+```
+
+### civicrm.searchdisplay_run
+```json
+{
+  "savedSearch": "Bookkeeping_Transactions",
+  "searchDisplay": "Bookkeeping_Transactions_Table_1"
 }
 ```
 

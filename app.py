@@ -280,6 +280,24 @@ async def civicrm_api_help(input: ApiHelpInput) -> CallToolResult:
     }
     return as_text_output(help_info)
 
+@app.tool()
+async def civicrm_searchdisplay_run(savedSearch: str, searchDisplay = None, ctx: Context = None) -> CallToolResult:
+    """Run the Saved Search with name given by parameter savedSearch. Optionally specifies the name of an associated Search Display to run. Returns results."""
+    
+    # Returns name of results file for rendering."""
+    entity = "SearchDisplay"
+    action = "run"
+
+    params = {
+        "savedSearch": savedSearch,
+    }
+    if searchDisplay:
+        params['display'] = searchDisplay
+
+    async with CiviCRMClient() as cli:
+        out = await cli.call(entity, action, params)
+
+    return as_text_output(out)
 
 if __name__ == "__main__":
 
