@@ -25,3 +25,5 @@ To completely disable the LLM's ability to create, modify, or delete records, re
 - `civicrm_delete_confirmed`
 - `civicrm_batch`
 - `civicrm_save`
+
+This will restrict the LLM's CiviCRM tools to `civicrm.get`, `civicrm.search`, `civicrm.schema.entities`, `civicrm.schema.fields`, and `civicm.getActions`.
