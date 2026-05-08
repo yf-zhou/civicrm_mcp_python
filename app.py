@@ -295,48 +295,9 @@ async def civicrm_searchdisplay_run(savedSearch: str, searchDisplay = None, ctx:
     async with CiviCRMClient() as cli:
         out = await cli.call(entity, action, params)
 
-    # write output to file
-    # output_file = [full path]
-    # logging.info(f"pwd: {os.getcwd()}")
-    # logging.info(f"directory contents: {os.listdir()}")
-    # logging.info(f"output file path: {os.path.abspath(output_file)}")
-    # with open(output_file, 'w') as f:
-    #     f.write(json.dumps(out, indent=2))
-
     return as_text_output(out)
 
-    # with open('response_output.json', 'r') as f:
-    #     data = json.loads(f.read())
-    
-    # return as_text_output(data)
-    # return output_file
-
-#----------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-
-    # parser = argparse.ArgumentParser(
-    #     description="Nimmt eine Umgebungsdatei (env_file) entgegen."
-    # )
-    # parser.add_argument(
-    #     "--env-file", "-e",
-    #     required=True,
-    #     help="Pfad zur .env-Datei (z.B. /path/to/.env)"
-    # )
-    # args = parser.parse_args()
-
-    # env_file = os.path.abspath(args.env_file)
-    # if not os.path.exists(env_file):
-    #     print(f"Fehler: Datei nicht gefunden: {env_file}", file=sys.stderr)
-    #     sys.exit(1)
-
-    # load_dotenv(env_file)
-
-    # CIVICRM_BASE = os.environ.get('CIVICRM_BASE')
-    # CIVI_USER_KEY = os.environ.get('CIVI_USER_KEY')
-    # CIVI_SITE_KEY = os.environ.get('CIVI_SITE_KEY')
-    # HTTP_TIMEOUT = int(os.environ.get('HTTP_TIMEOUT', '30'))
-    # LOG_FILE = os.environ.get('LOG_FILE', 'civicrm_mcp.log')
-    # LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
     # stdio mode
     app.run()
