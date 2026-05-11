@@ -14,6 +14,126 @@ class GDPRFieldFilter:
     
     # Felder die IMMER durchgelassen werden können (keine personenbezogenen Daten)
     ALLOWED_FIELDS: Dict[str, Set[str]] = {
+            # All whitelisted columns from other entities, as well as 'data'
+            'SearchDisplay': {
+                'city',
+                'activity_date_time',
+                'activity_type_id',
+                'address_billing.id',
+                'address_primary.id',
+                'addressee_id',
+                'age_years',
+                'campaign_id',
+                'cancel_date',
+                'case_type_id',
+                'communication_style_id',
+                'contact_id',
+                'contact_id_a',
+                'contact_id_b',
+                'contact_is_deleted',
+                'contact_sub_type',
+                'contact_type',
+                'contribution_page_id',
+                'contribution_recur_id',
+                'contribution_status_id',
+                'country_id',
+                'county_id',
+                'created_date',
+                'currency',
+                'data',
+                'description',
+                'discount_id',
+                'do_not_email',
+                'do_not_mail',
+                'do_not_phone',
+                'do_not_sms',
+                'do_not_trade',
+                'duration',
+                'email_greeting_id',
+                'email_primary.id',
+                'end_date',
+                'engagement_level',
+                'entity_id',
+                'entity_table',
+                'event_id',
+                'event_type_id',
+                'external_identifier',
+                'fee_amount',
+                'fee_currency',
+                'fee_level',
+                'financial_type_id',
+                'gender_id',
+                'group_type',
+                'groups',
+                'hold_date',
+                'id',
+                'im_primary.id',
+                'is_active',
+                'is_billing',
+                'is_bulkmail',
+                'is_current_revision',
+                'is_deceased',
+                'is_deleted',
+                'is_hidden',
+                'is_monetary',
+                'is_online_registration',
+                'is_opt_out',
+                'is_override',
+                'is_pay_later',
+                'is_permission_a_b',
+                'is_permission_b_a',
+                'is_primary',
+                'is_public',
+                'is_reserved',
+                'is_selectable',
+                'is_tagset',
+                'is_template',
+                'is_test',
+                'join_date',
+                'location_type_id',
+                'manual_geo_code',
+                'master_id',
+                'max_participants',
+                'membership_type_id',
+                'modified_date',
+                'name',
+                'net_amount',
+                'on_hold',
+                'parent_id',
+                'payment_instrument_id',
+                'phone_primary.id',
+                'phone_type_id',
+                'postal_greeting_id',
+                'preferred_communication_method',
+                'preferred_language',
+                'prefix_id',
+                'primary_contact_id',
+                'priority_id',
+                'privacy',
+                'provider_id',
+                'receipt_date',
+                'receive_date',
+                'register_date',
+                'relationship_type_id',
+                'reset_date',
+                'role_id',
+                'source',
+                'source_contact_id',
+                'start_date',
+                'state_province_id',
+                'status_id',
+                'suffix_id',
+                'tags',
+                'tax_amount',
+                'thankyou_date',
+                'timezone',
+                'title',
+                'total_amount',
+                'user_unique_id',
+                'values',
+                'visibility',
+                'website_type_id',
+            },
         'Contact': {
             # IDs und Metadaten
             'id', 'contact_id', 'contact_type', 'contact_sub_type', 'external_identifier',
@@ -264,10 +384,16 @@ class GDPRFieldFilter:
         for key, value in record.items():
             # Immer ID durchlassen
             if key == 'id' or key.endswith('_id') or key.endswith('.id'):
-                filtered[key] = value
+                if isinstance(value, dict):
+                    filtered[key] = cls._filter_record(entity, value)
+                else:
+                    filtered[key] = value
             # Erlaubte Felder durchlassen
             elif key in allowed:
-                filtered[key] = value
+                if isinstance(value, dict):
+                    filtered[key] = cls._filter_record(entity, value)
+                else:
+                    filtered[key] = value
             # Aggregierbare Felder werden entfernt und geloggt
             elif key in aggregate:
                 removed_fields.append(key)
@@ -302,7 +428,16 @@ class GDPRFieldFilter:
         """
         result = filtered.copy()
         
-        if entity == 'Contact':
+        # Handle contact fields separately so we can add an additional heuristic (requiring contact_type) before adding display name
+        if entity == 'SearchDisplay':
+            if 'id' in result and 'contact_type' in result:
+                id = result['id']
+                contact_type = result['contact_type']
+                result['_display_name'] = f"{contact_type} #{id}"
+            if 'birth_date' in original and original['birth_date']:
+                result['_has_birth_date'] = True
+
+        elif entity == 'Contact':
             # Anonymisierter Display-Name statt echtem Namen
             if 'id' in result:
                 contact_type = result.get('contact_type', 'Contact')
@@ -319,7 +454,7 @@ class GDPRFieldFilter:
             if removed:
                 result['_filtered_fields'] = removed
         
-        elif entity == 'Address':
+        elif entity == 'Address' or entity == 'SearchDisplay':
             # Nur Region statt vollständiger Adresse
             if 'country_id' in result:
                 result['_has_address'] = True
@@ -332,22 +467,22 @@ class GDPRFieldFilter:
             if removed:
                 result['_filtered_fields'] = removed
         
-        elif entity == 'Email':
+        elif entity == 'Email' or entity == 'SearchDisplay':
             if 'email' in original:
                 result['_has_email'] = True
                 result['_filtered_fields'] = ['email']
         
-        elif entity == 'Phone':
+        elif entity == 'Phone' or entity == 'SearchDisplay':
             if 'phone' in original:
                 result['_has_phone'] = True
                 result['_filtered_fields'] = ['phone', 'phone_ext']
         
-        elif entity == 'Activity':
+        elif entity == 'Activity' or entity == 'SearchDisplay':
             if 'subject' in original or 'details' in original:
                 result['_has_content'] = True
                 result['_filtered_fields'] = [k for k in ['subject', 'details', 'location'] if k in original]
         
-        elif entity == 'Note':
+        elif entity == 'Note' or entity == 'SearchDisplay':
             if 'note' in original or 'subject' in original:
                 result['_has_content'] = True
                 result['_filtered_fields'] = [k for k in ['subject', 'note'] if k in original]
