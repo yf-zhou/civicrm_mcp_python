@@ -267,7 +267,10 @@ class GDPRFieldFilter:
         # Handle explicit joins
         if "api_params" in saved_search_value:
             if "select" in saved_search_value["api_params"]:
-                fields = saved_search_value["api_params"]["select"]
+                fields = [
+                    cls._select_clause_to_field(select) 
+                    for select in saved_search_value["api_params"]["select"]
+                ]
             else:
                 fields = []
             if "join" in saved_search_value["api_params"]:
@@ -275,7 +278,7 @@ class GDPRFieldFilter:
                     if isinstance(join, list):
                         entity_as_alias: str = join[0]
                         entity, alias = entity_as_alias.split(" AS ", 1)
-                        for field in fields:
+                        for field in fields[:]:
                             field: str
                             if alias in field:
                                 fields_to_entity_field[field] = (
@@ -306,6 +309,14 @@ class GDPRFieldFilter:
             ]
 
         return filtered
+
+    @classmethod
+    def _select_clause_to_field(cls, select_clause: str) -> str:
+        # Note: this ignore calculated fields (e.g., GROUP_CONCAT(UNIQUE myfield))
+        # This results in those fields being whitelisted if they are id fields and otherwise removed
+        if " AS " in select_clause:
+            return select_clause.split(" AS ", 1)[1]
+        return select_clause
 
     @classmethod
     async def _get_implicitly_joined_entity_and_field(
@@ -375,7 +386,7 @@ class GDPRFieldFilter:
         removed_fields = []
 
         for key, value in record.items():
-            entity, field = fields_to_entity_field[key]
+            entity, field = fields_to_entity_field.get(key, (base_entity, key))
             if cls._is_field_whitelisted(
                 entity,
                 field,
