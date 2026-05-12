@@ -319,8 +319,16 @@ async def civicrm_searchdisplay_run(savedSearch: str, searchDisplay = None, ctx:
         params['display'] = searchDisplay
 
     async with CiviCRMClient() as cli:
+        saved_search_data = await cli.call("SavedSearch", "get", {
+            "where": [[
+                "name", "=", savedSearch
+                ]]
+            })
+    with open('/Users/rafe/ai/civicrm_mcp_python/log.txt', 'w') as logfile:
+        logfile.write(f"saved_search_data: {saved_search_data}")
+    async with CiviCRMClient() as cli:
         out = await cli.call(entity, action, params)
-    filtered_out = GDPRFieldFilter.filter_response(entity, out)
+    filtered_out = await GDPRFieldFilter.filter_searchdisplay_response(saved_search_data, out)
 
     return as_text_output(filtered_out)
 

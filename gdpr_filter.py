@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Set, Optional
+from civicrm_client import CiviCRMClient
 
 _logger = logging.getLogger("civicrm-mcp.gdpr")
 
@@ -14,127 +15,7 @@ class GDPRFieldFilter:
     
     # Felder die IMMER durchgelassen werden können (keine personenbezogenen Daten)
     ALLOWED_FIELDS: Dict[str, Set[str]] = {
-            # All whitelisted columns from other entities, as well as 'data'
-            'SearchDisplay': {
-                'city',
-                'activity_date_time',
-                'activity_type_id',
-                'address_billing.id',
-                'address_primary.id',
-                'addressee_id',
-                'age_years',
-                'campaign_id',
-                'cancel_date',
-                'case_type_id',
-                'communication_style_id',
-                'contact_id',
-                'contact_id_a',
-                'contact_id_b',
-                'contact_is_deleted',
-                'contact_sub_type',
-                'contact_type',
-                'contribution_page_id',
-                'contribution_recur_id',
-                'contribution_status_id',
-                'country_id',
-                'county_id',
-                'created_date',
-                'currency',
-                'data',
-                'description',
-                'discount_id',
-                'do_not_email',
-                'do_not_mail',
-                'do_not_phone',
-                'do_not_sms',
-                'do_not_trade',
-                'duration',
-                'email_greeting_id',
-                'email_primary.id',
-                'end_date',
-                'engagement_level',
-                'entity_id',
-                'entity_table',
-                'event_id',
-                'event_type_id',
-                'external_identifier',
-                'fee_amount',
-                'fee_currency',
-                'fee_level',
-                'financial_type_id',
-                'gender_id',
-                'group_type',
-                'groups',
-                'hold_date',
-                'id',
-                'im_primary.id',
-                'is_active',
-                'is_billing',
-                'is_bulkmail',
-                'is_current_revision',
-                'is_deceased',
-                'is_deleted',
-                'is_hidden',
-                'is_monetary',
-                'is_online_registration',
-                'is_opt_out',
-                'is_override',
-                'is_pay_later',
-                'is_permission_a_b',
-                'is_permission_b_a',
-                'is_primary',
-                'is_public',
-                'is_reserved',
-                'is_selectable',
-                'is_tagset',
-                'is_template',
-                'is_test',
-                'join_date',
-                'location_type_id',
-                'manual_geo_code',
-                'master_id',
-                'max_participants',
-                'membership_type_id',
-                'modified_date',
-                'name',
-                'net_amount',
-                'on_hold',
-                'parent_id',
-                'payment_instrument_id',
-                'phone_primary.id',
-                'phone_type_id',
-                'postal_greeting_id',
-                'preferred_communication_method',
-                'preferred_language',
-                'prefix_id',
-                'primary_contact_id',
-                'priority_id',
-                'privacy',
-                'provider_id',
-                'receipt_date',
-                'receive_date',
-                'register_date',
-                'relationship_type_id',
-                'reset_date',
-                'role_id',
-                'source',
-                'source_contact_id',
-                'start_date',
-                'state_province_id',
-                'status_id',
-                'suffix_id',
-                'tags',
-                'tax_amount',
-                'thankyou_date',
-                'timezone',
-                'title',
-                'total_amount',
-                'user_unique_id',
-                'values',
-                'visibility',
-                'website_type_id',
-            },
-        'Contact': {
+        "Contact": {
             # IDs und Metadaten
             'id', 'contact_id', 'contact_type', 'contact_sub_type', 'external_identifier',
             
@@ -366,7 +247,91 @@ class GDPRFieldFilter:
         
         _logger.debug(f"Filtered {entity} response: {len(filtered.get('values', []))} records")
         return filtered
-    
+
+    @classmethod
+    async def filter_searchdisplay_response(
+        cls, savedSearch: Dict[str, Any], response: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        filtered = response.copy()
+        if "values" not in savedSearch:
+            return cls.filter_response("SearchDisplay", response)
+        values = savedSearch["values"]
+        if not isinstance(values, list):
+            return cls.filter_response("SearchDisplay", response)
+        saved_search_value = values[0]
+        if "api_entity" not in saved_search_value:
+            return cls.filter_response("SearchDisplay", response)
+        base_entity = saved_search_value["api_entity"]
+        fields_to_entity_field: dict[str, tuple[str, str]] = {}
+
+        # Handle explicit joins
+        if "api_params" in saved_search_value:
+            if "select" in saved_search_value["api_params"]:
+                fields = saved_search_value["api_params"]["select"]
+            else:
+                fields = []
+            if "join" in saved_search_value["api_params"]:
+                for join in saved_search_value["api_params"]["join"]:
+                    if isinstance(join, list):
+                        entity_as_alias: str = join[0]
+                        entity, alias = entity_as_alias.split(" AS ", 1)
+                        for field in fields:
+                            field: str
+                            if alias in field:
+                                fields_to_entity_field[field] = (
+                                    entity,
+                                    field.replace(alias + ".", "", 1),
+                                )
+                                fields.remove(field)
+        else:
+            fields = []
+        for field in fields:
+            fields_to_entity_field[field] = base_entity, field
+
+        # Handle implicit joins
+        fields_to_entity_field = {
+            k: await cls._get_implicitly_joined_entity_and_field(entity, field)
+            for k, (entity, field) in fields_to_entity_field.items()
+        }
+
+        if "values" in filtered and isinstance(filtered["values"], list):
+            filtered["values"] = [
+                {
+                    "data": cls._filter_joined_record(
+                        record["data"], fields_to_entity_field, base_entity
+                    )
+                }
+                for record in filtered["values"]
+                if "data" in record
+            ]
+
+        return filtered
+
+    @classmethod
+    async def _get_implicitly_joined_entity_and_field(
+        cls, original_entity: str, field: str
+    ) -> tuple[str, str]:
+        # TODO: if performance is bad we can cache what the implicit joins are
+        if "." not in field:
+            return original_entity, field
+        field_with_fk, fk_field = field.split(".", 1)
+        async with CiviCRMClient() as cli:
+            field_info = await cli.call(
+                original_entity,
+                "getFields",
+                {"where": [["name", "=", field_with_fk]], "select": ["fk_entity"]},
+            )
+        if (
+            "values" in field_info
+            and isinstance(field_info["values"], list)
+            and len(field_info["values"]) > 0
+            and "fk_entity" in field_info["values"][0]
+        ):
+            return await cls._get_implicitly_joined_entity_and_field(
+                field_info["values"][0]["fk_entity"], fk_field
+            )
+        return original_entity, field
+
     @classmethod
     def _filter_record(cls, entity: str, record: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -383,28 +348,8 @@ class GDPRFieldFilter:
         
         for key, value in record.items():
             # Immer ID durchlassen
-            if key == 'id' or key.endswith('_id') or key.endswith('.id'):
-                if isinstance(value, dict):
-                    filtered[key] = cls._filter_record(entity, value)
-                else:
-                    filtered[key] = value
-            # Erlaubte Felder durchlassen
-            elif key in allowed:
-                if isinstance(value, dict):
-                    filtered[key] = cls._filter_record(entity, value)
-                else:
-                    filtered[key] = value
-            # Aggregierbare Felder werden entfernt und geloggt
-            elif key in aggregate:
-                removed_fields.append(key)
-            # Unbekannte Felder: Bei unbekannten Entities nur IDs durchlassen
-            elif entity not in cls.ALLOWED_FIELDS:
-                # Unbekannte Entity: sehr restriktiv, nur IDs
-                if key.endswith('_id') or key.endswith('.id'):
-                    filtered[key] = value
-                else:
-                    removed_fields.append(key)
-            # Alles andere wird entfernt
+            if cls._is_field_whitelisted(entity, key, allowed, aggregate):
+                filtered[key] = value
             else:
                 removed_fields.append(key)
         
@@ -415,7 +360,75 @@ class GDPRFieldFilter:
             _logger.debug(f"Removed {len(removed_fields)} fields from {entity}: {removed_fields[:5]}...")
         
         return filtered
-    
+
+    @classmethod
+    def _filter_joined_record(
+        cls,
+        record: Dict[str, Any],
+        fields_to_entity_field: Dict[str, tuple[str, str]],
+        base_entity: str,
+    ) -> Dict[str, Any]:
+        if not isinstance(record, dict):
+            return record
+
+        filtered = {}
+        removed_fields = []
+
+        for key, value in record.items():
+            entity, field = fields_to_entity_field[key]
+            if cls._is_field_whitelisted(
+                entity,
+                field,
+                cls.ALLOWED_FIELDS.get(entity, set()),
+                cls.AGGREGATE_FIELDS.get(entity, set()),
+            ):
+                filtered[key] = value
+            else:
+                removed_fields.append(key)
+
+        for entity in [entity for _, (entity, _) in fields_to_entity_field.items()]:
+            _logger.debug(f"Added anonymized fields for entity {entity}")
+            filtered = cls._add_anonymized_fields(
+                entity,
+                {
+                    field: True
+                    for _, (_entity, field) in fields_to_entity_field.items()
+                    if _entity == entity
+                },
+                filtered,
+            )
+
+        if removed_fields:
+            _logger.debug(
+                f"Removed {len(removed_fields)} fields from {base_entity}: {removed_fields[:5]}...\n"
+            )
+
+        return filtered
+
+    @classmethod
+    def _is_field_whitelisted(
+        cls, entity, key, allowed: Set[str] = set(), aggregate: Set[str] = set()
+    ) -> bool:
+        # Immer ID durchlassen
+        if key == "id" or key.endswith("_id") or key.endswith(".id"):
+            return True
+        # Erlaubte Felder durchlassen
+        elif key in allowed:
+            return True
+        # Aggregierbare Felder werden entfernt und geloggt
+        elif key in aggregate:
+            return False
+        # Unbekannte Felder: Bei unbekannten Entities nur IDs durchlassen
+        elif entity not in cls.ALLOWED_FIELDS:
+            # Unbekannte Entity: sehr restriktiv, nur IDs
+            if key.endswith("_id") or key.endswith(".id"):
+                return True
+            else:
+                return False
+        # Alles andere wird entfernt
+        else:
+            return False
+
     @classmethod
     def _add_anonymized_fields(
         cls, 
@@ -427,17 +440,8 @@ class GDPRFieldFilter:
         Fügt anonymisierte Ersatzfelder hinzu (z.B. "Contact #123" statt Namen).
         """
         result = filtered.copy()
-        
-        # Handle contact fields separately so we can add an additional heuristic (requiring contact_type) before adding display name
-        if entity == 'SearchDisplay':
-            if 'id' in result and 'contact_type' in result:
-                id = result['id']
-                contact_type = result['contact_type']
-                result['_display_name'] = f"{contact_type} #{id}"
-            if 'birth_date' in original and original['birth_date']:
-                result['_has_birth_date'] = True
 
-        elif entity == 'Contact':
+        if entity == 'Contact':
             # Anonymisierter Display-Name statt echtem Namen
             if 'id' in result:
                 contact_type = result.get('contact_type', 'Contact')
@@ -452,9 +456,11 @@ class GDPRFieldFilter:
             aggregate = cls.AGGREGATE_FIELDS.get(entity, set())
             removed = [k for k in original.keys() if k in aggregate]
             if removed:
-                result['_filtered_fields'] = removed
-        
-        elif entity == 'Address' or entity == 'SearchDisplay':
+                result['_filtered_fields'] = list(
+                    set(result.get('_filtered_fields', []) + removed)
+                )
+
+        elif entity == 'Address':
             # Nur Region statt vollständiger Adresse
             if 'country_id' in result:
                 result['_has_address'] = True
@@ -465,28 +471,48 @@ class GDPRFieldFilter:
             aggregate = cls.AGGREGATE_FIELDS.get(entity, set())
             removed = [k for k in original.keys() if k in aggregate]
             if removed:
-                result['_filtered_fields'] = removed
-        
-        elif entity == 'Email' or entity == 'SearchDisplay':
+                result['_filtered_fields'] = list(
+                    set(result.get('_filtered_fields', []) + removed)
+                )
+
+        elif entity == 'Email':
             if 'email' in original:
                 result['_has_email'] = True
-                result['_filtered_fields'] = ['email']
-        
-        elif entity == 'Phone' or entity == 'SearchDisplay':
+                result['_filtered_fields'] = list(
+                    set(result.get('_filtered_fields', []) + ['email'])
+                )
+
+        elif entity == 'Phone':
             if 'phone' in original:
                 result['_has_phone'] = True
-                result['_filtered_fields'] = ['phone', 'phone_ext']
-        
-        elif entity == 'Activity' or entity == 'SearchDisplay':
+                result['_filtered_fields'] = list(
+                    set(result.get('_filtered_fields', []) + ['phone', 'phone_ext'])
+                )
+
+        elif entity == 'Activity':
             if 'subject' in original or 'details' in original:
                 result['_has_content'] = True
-                result['_filtered_fields'] = [k for k in ['subject', 'details', 'location'] if k in original]
-        
-        elif entity == 'Note' or entity == 'SearchDisplay':
+                result['_filtered_fields'] = list(
+                    set(
+                        result.get('_filtered_fields', [])
+                        + [
+                            k
+                            for k in ['subject', 'details', 'location']
+                            if k in original
+                        ]
+                    )
+                )
+
+        elif entity == 'Note':
             if 'note' in original or 'subject' in original:
                 result['_has_content'] = True
-                result['_filtered_fields'] = [k for k in ['subject', 'note'] if k in original]
-        
+                result['_filtered_fields'] = list(
+                    set(
+                        result.get('_filtered_fields', [])
+                        + [k for k in ['subject', 'note'] if k in original]
+                    )
+                )
+
         return result
     
     @classmethod
