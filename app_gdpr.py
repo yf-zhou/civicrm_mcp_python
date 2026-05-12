@@ -304,6 +304,33 @@ async def civicrm_api_help(input: ApiHelpInput) -> CallToolResult:
     }
     return as_text_output(help_info)
 
+@app.tool()
+async def civicrm_searchdisplay_run(savedSearch: str, searchDisplay = None, ctx: Context = None) -> CallToolResult:
+    """Run the Saved Search with name given by parameter savedSearch. Optionally specifies the name of an associated Search Display to run. Returns results."""
+    
+    # Returns name of results file for rendering."""
+    entity = "SearchDisplay"
+    action = "run"
+
+    params = {
+        "savedSearch": savedSearch,
+    }
+    if searchDisplay:
+        params['display'] = searchDisplay
+
+    async with CiviCRMClient() as cli:
+        saved_search_data = await cli.call("SavedSearch", "get", {
+            "where": [[
+                "name", "=", savedSearch
+                ]]
+            })
+    with open('/Users/rafe/ai/civicrm_mcp_python/log.txt', 'w') as logfile:
+        logfile.write(f"saved_search_data: {saved_search_data}")
+    async with CiviCRMClient() as cli:
+        out = await cli.call(entity, action, params)
+    filtered_out = await GDPRFieldFilter.filter_searchdisplay_response(saved_search_data, out)
+
+    return as_text_output(filtered_out)
 
 if __name__ == "__main__":
 
